@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+
+service RealtimeService{
+    rpc Connect (ClientInfo) returns (ConnectionResponse);
+    rpc SendMessage (Message) returns (stream Message);
+    rpc BroadcastMessage (Message) returns (BroadcastResponse);
+}
+
+message ClientInfo{
+    string clientId = 1;
+}
+
+message ConnectionResponse{
+    string message = 1;
+}
+
+message Message{
+    string clientId = 1;
+    string content = 2;
+}
+
+message BroadcastResponse{
+    string senderClientId = 1;
+    string content = 2;
+}

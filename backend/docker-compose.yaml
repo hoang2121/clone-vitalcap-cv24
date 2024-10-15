@@ -1,0 +1,89 @@
+# version: '3.8'
+
+services:
+  db:
+    image: mysql:latest
+    restart: always
+    environment:
+      MYSQL_DATABASE: files
+      MYSQL_ALLOW_EMPTY_PASSWORD: "true"
+    ports:
+      - '3306:3306'
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 2s
+      retries: 2
+    volumes:
+      # - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - mysql_data:/var/lib/mysql
+    networks:
+      - app-network
+
+  backend:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DIALECT: ${DB_DIALECT}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      HMAC_KEY: ${HMAC_KEY}
+      GOOGLE_CREDENTIALS: ${GOOGLE_CREDENTIALS}
+      FIREBASE_CONFIG: ${FIREBASE_CONFIG}
+      ACCESS_TOKEN_LIFE: ${ACCESS_TOKEN_LIFE}
+      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET}
+      SERVICEACCOUNTKEY: ${SERVICEACCOUNTKEY}
+      TEST_USER: ${TEST_USER}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      OPENAIAPIKEY: ${OPENAIAPIKEY}
+    ports:
+      - '8080:8080'
+      - '50051:50051'
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./uploads:/usr/src/app/uploads
+    networks:
+      - app-network
+
+  webserver:
+    image: nginx:1.25.5
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "3000:3000"
+    entrypoint: >
+      sh -c "
+        if [ ! -d /etc/nginx/sites-enabled ]; then
+          mkdir -p /etc/nginx/sites-enabled;
+        fi;
+        if [ ! -L /etc/nginx/sites-enabled/backend.conf ]; then
+          ln -s /etc/nginx/sites-available/backend.conf /etc/nginx/sites-enabled/;
+        fi;  
+        if [ ! -d /etc/nginx/ssl.certificate/ ]; then
+          mkdir /etc/nginx/ssl.certificate/;
+        fi;
+        nginx -g 'daemon off;
+        '
+      "
+    volumes:
+      - ./nginx-conf/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx-conf/backend.conf:/etc/nginx/sites-available/backend.conf
+      - ./nginx-conf/ssl.certificate/:/etc/nginx/ssl.certificate/
+    links:
+      - backend
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mysql_data:    
